@@ -1,0 +1,158 @@
+
+root: ROOT
+run_name: NAME
+seed: 0                 
+dataset_seed: 0                            
+append: false                                     
+default_dtype: float32 
+
+
+# ========= network =========
+model_builders:
+ - allegro.model.Allegro
+ - PerSpeciesRescale
+ - ForceOutput
+ - RescaleEnergyEtc
+
+
+r_max: 9.0
+
+# average number of neighbors in an environment is used to normalize the sum, auto precomputed it automitcally 
+avg_num_neighbors: auto
+
+# radial basis
+# set true to train the bessel roots
+BesselBasis_trainable: true
+
+# p-parameter in envelope function, as proposed in Klicpera, J. et al., arXiv:2003.03123 
+# sets it BOTH for the RadialBasisProjection AND the Allegro_Module
+PolynomialCutoff_p: 6  
+
+# symmetry
+# maximum order l to use in spherical harmonics embedding, 1 is basedline (fast), 2 is more accurate, but slower, 3 highly accurate but slow
+l_max: 1
+
+# whether to include E(3)-symmetry / parity
+# allowed: o3_full, o3_restricted, so3
+parity: o3_full  
+
+# number of tensor product layers, 1-3 usually best, more is more accurate but slower
+num_layers: 3
+
+# number of features, more is more accurate but slower, 1, 4, 8, 16, 64, 128 are good options to try depending on data set
+env_embed_multiplicity: 32
+
+# whether or not to embed the initial edge, true often works best
+embed_initial_edge: true
+
+# hidden layer dimensions of the 2-body embedding MLP
+two_body_latent_mlp_latent_dimensions: [64, 128, 256]
+# nonlinearity used in the 2-body embedding MLP
+two_body_latent_mlp_nonlinearity: silu
+# weight initialization of the 2-body embedding MLP
+two_body_latent_mlp_initialization: uniform
+
+# hidden layer dimensions of the latent MLP
+# these MLPs are cheap if you have have large l/env_embed_multiplicity, so a good place to put model capacity if you can afford it
+# only if you are in the ultra-fast/scalable regime, make these smaller
+latent_mlp_latent_dimensions: [256, 256]
+
+# nonlinearity used in the latent MLP
+latent_mlp_nonlinearity: silu
+
+# weight initialization of the latent MLP
+latent_mlp_initialization: uniform
+
+# whether to use a resnet update in the scalar latent latent space, true works best usually
+latent_resnet: true
+
+# hidden layer dimensions of the environment embedding mlp, none work best (will build a single linear layer)
+env_embed_mlp_latent_dimensions: []
+
+# nonlinearity used in the environment embedding mlp
+env_embed_mlp_nonlinearity: null
+
+# weight initialzation of the environment embedding mlp
+env_embed_mlp_initialization: uniform
+
+# - end allegro layers -
+
+# Final MLP to go from Allegro latent space to edge energies:
+
+# hidden layer dimensions of the per-edge energy final MLP
+edge_eng_mlp_latent_dimensions: [128]
+
+# nonlinearity used in the per-edge energy final MLP
+edge_eng_mlp_nonlinearity: null
+
+# weight initialzation in the per-edge energy final MLP
+edge_eng_mlp_initialization: uniform
+
+# data set
+dataset: ase                                                                   
+ase_args:
+      format: traj
+dataset_file_name: AuTiO2.traj 
+
+chemical_symbol_to_type:
+  Ti: 0
+  O: 1
+  Au: 2
+
+# logging
+wandb: false
+wandb_project: 3dn  
+wandb_resume: false   
+                                                                                
+verbose: info                                       
+log_batch_freq: 1000000       
+log_epoch_freq: 1       
+save_checkpoint_freq: -1         
+save_ema_checkpoint_freq: -1    
+
+# training
+n_train: 3000                                                            
+n_val: 958 # This means 957 for testing !                                                            
+learning_rate: 0.005                                  
+
+batch_size: 1
+max_epochs: 200     
+train_val_split: sequential  
+shuffle: false    
+metrics_key: validation_loss   
+use_ema: true                  
+ema_decay: 0.99          
+ema_use_num_updates: true  
+
+# early stopping based on metrics values.
+early_stopping_patiences:   
+  validation_loss: 30
+
+# loss function
+loss_coeffs:  
+  forces: 1 
+  total_energy:    
+    - 1
+    - PerAtomMSELoss
+
+# output metrics
+metrics_components:
+  - - forces
+    - rmse
+    - PerSpecies: True
+      report_per_component: False
+  - - total_energy
+    - rmse
+    - PerAtom: True 
+    
+optimizer_name: Adam                                                          
+optimizer_amsgrad: true
+
+lr_scheduler_name: ReduceLROnPlateau
+lr_scheduler_patience: 100
+lr_scheduler_factor: 0.5
+
+
+
+per_species_rescale_shifts: dataset_per_atom_total_energy_mean
+per_species_rescale_scales: dataset_forces_rms
